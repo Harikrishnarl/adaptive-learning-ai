@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NeuralPath — Adaptive Learning</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #060612; --bg2: #0d0d1f; --surface: #12122a; --surface2: #1a1a35;
+  --border: #2a2a4a; --accent: #7c6af7; --accent2: #06d6a0;
+  --accent3: #ffd166; --accent4: #ef476f; --text: #e8e8ff;
+  --muted: #6b6b99; --radius: 14px;
+  --font: 'Outfit', sans-serif; --mono: 'JetBrains Mono', monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(124,106,247,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(124,106,247,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+/* Auth Tabs */
+.auth-tabs { display: flex; gap: 8px; margin-bottom: 24px; background: var(--surface2); padding: 5px; border-radius: 12px; }
+.auth-tab { flex: 1; padding: 10px; border: none; background: transparent; color: var(--muted); border-radius: 8px; font-family: var(--font); font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.auth-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.logout-btn { background: transparent; border: none; color: var(--accent4); cursor: pointer; padding: 8px; border-radius: 8px; transition: background 0.2s; font-size: 16px; display: grid; place-items: center;}
+.logout-btn:hover { background: rgba(239,71,111,0.1); }
+
+/* Onboarding */
+#onboarding{position:fixed;inset:0;background:rgba(6,6,18,.97);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(10px)}
+.onboard-card{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px;width:480px;text-align:center;animation:popIn .5s cubic-bezier(.34,1.56,.64,1) both}
+.onboard-card .logo{font-size:48px;margin-bottom:8px}
+.onboard-card h1{font-size:28px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.onboard-card>p{color:var(--muted);margin-bottom:32px;font-size:15px}
+.form-group{margin-bottom:18px;text-align:left}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.form-group input,.form-group select{width:100%;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font);font-size:15px;outline:none;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+.btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),#5b4de0);border:none;border-radius:12px;color:#fff;font-family:var(--font);font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;margin-top:8px}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(124,106,247,.35)}
+
+/* Layout */
+#app{display:none;position:relative;z-index:1}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:24px 0;z-index:50}
+.sidebar-logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sidebar-logo h2{font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sidebar-logo p{font-size:11px;color:var(--muted);margin-top:2px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:11px 20px;cursor:pointer;font-size:14px;font-weight:500;color:var(--muted);border-left:3px solid transparent;transition:all .15s;margin:1px 0}
+.nav-item:hover{color:var(--text);background:rgba(124,106,247,.07)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(124,106,247,.1)}
+.nav-item .icon{font-size:18px;min-width:22px}
+.sidebar-bottom{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
+.student-chip{display:flex;align-items:center;gap:10px}
+.avatar-sm{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-weight:700;font-size:14px}
+.student-chip .sname{font-size:13px;font-weight:600}
+.student-chip .srole{font-size:11px;color:var(--muted)}
+.main{margin-left:240px;min-height:100vh}
+.page{display:none;padding:32px;animation:fadeUp .4s ease both}
+.page.active{display:block}
+.page-header{margin-bottom:28px}
+.page-header h1{font-size:26px;font-weight:800;margin-bottom:4px}
+.page-header p{color:var(--muted);font-size:14px}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px}
+.card-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:16px}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;top:0;right:0;width:60px;height:60px;border-radius:50%;transform:translate(20px,-20px)}
+.stat-card.s1::after{background:rgba(124,106,247,.15)}.stat-card.s2::after{background:rgba(6,214,160,.15)}
+.stat-card.s3::after{background:rgba(255,209,102,.15)}.stat-card.s4::after{background:rgba(239,71,111,.15)}
+.stat-val{font-size:32px;font-weight:800;line-height:1;margin-bottom:4px}
+.stat-card.s1 .stat-val{color:var(--accent)}.stat-card.s2 .stat-val{color:var(--accent2)}
+.stat-card.s3 .stat-val{color:var(--accent3)}.stat-card.s4 .stat-val{color:var(--accent4)}
+.stat-label{font-size:12px;color:var(--muted);font-weight:500}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+
+/* SW bars */
+.sw-item{margin-bottom:12px}
+.sw-header{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+.sw-label{font-weight:500}.sw-score{font-weight:700;font-family:var(--mono)}
+.bar-track{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width 1s cubic-bezier(.4,0,.2,1)}
+.bar-strength{background:linear-gradient(90deg,var(--accent2),#0ad4a2)}
+.bar-weakness{background:linear-gradient(90deg,var(--accent4),#f97b41)}
+
+/* Subjects */
+.subject-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.subject-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.subject-card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 8px 28px rgba(0,0,0,.3)}
+.subject-icon{font-size:36px;margin-bottom:10px;display:block}
+.subject-name{font-size:17px;font-weight:700;margin-bottom:6px}
+.subject-topics-count{font-size:12px;color:var(--muted)}
+.tag-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.topic-tag{font-size:10px;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:var(--muted)}
+.topic-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.topic-pill{padding:8px 16px;border-radius:20px;font-size:13px;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .15s}
+.topic-pill:hover{border-color:var(--accent);color:var(--accent);background:rgba(124,106,247,.1)}
+
+/* Quiz */
+.quiz-progress{display:flex;gap:6px;margin-bottom:24px}
+.q-dot{flex:1;height:4px;border-radius:2px;background:var(--surface2);transition:background .3s}
+.q-dot.done{background:var(--accent2)}.q-dot.current{background:var(--accent)}
+.question-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px;margin-bottom:16px}
+.q-meta{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.q-badge{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600;font-family:var(--mono)}
+.badge-easy{background:rgba(6,214,160,.15);color:var(--accent2)}
+.badge-medium{background:rgba(255,209,102,.15);color:var(--accent3)}
+.badge-hard{background:rgba(239,71,111,.15);color:var(--accent4)}
+.badge-sub{background:rgba(124,106,247,.15);color:var(--accent)}
+.question-text{font-size:17px;font-weight:500;line-height:1.6;margin-bottom:20px}
+.options{display:grid;gap:10px}
+.option{padding:14px 18px;background:var(--surface2);border:2px solid var(--border);border-radius:12px;cursor:pointer;font-size:14px;font-weight:500;transition:all .15s;display:flex;align-items:center;gap:12px}
+.option:hover:not(.selected):not(.correct):not(.wrong){border-color:var(--accent);background:rgba(124,106,247,.08)}
+.option.selected{border-color:var(--accent);background:rgba(124,106,247,.12)}
+.option.correct{border-color:var(--accent2);background:rgba(6,214,160,.12)}
+.option.wrong{border-color:var(--accent4);background:rgba(239,71,111,.1)}
+.option-letter{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--border);font-size:12px;font-weight:700;flex-shrink:0}
+.explanation-box{margin-top:14px;padding:14px;background:rgba(124,106,247,.08);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;font-size:13px;line-height:1.6;color:var(--text);display:none}
+.explanation-box.visible{display:block}
+.quiz-nav{display:flex;gap:10px;margin-top:16px}
+.btn{padding:12px 24px;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-accent{background:var(--accent);color:#fff}.btn-accent:hover{background:#6b5be0;transform:translateY(-1px)}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--muted)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-success{background:var(--accent2);color:#000}.btn-success:hover{filter:brightness(1.1)}
+.result-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:36px;text-align:center;display:none}
+.result-score{font-size:64px;font-weight:800;line-height:1}
+.result-label{font-size:18px;color:var(--muted);margin:8px 0 24px}
+.result-breakdown{display:flex;justify-content:center;gap:32px;margin-bottom:24px}
+.rb-item{text-align:center}
+.rb-val{font-size:24px;font-weight:700;font-family:var(--mono)}
+.rb-key{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* Charts */
+.chart-wrap{position:relative;height:260px}
+.chart-wrap-sm{position:relative;height:200px}
+
+/* Path */
+.path-timeline{position:relative;padding-left:36px}
+.path-timeline::before{content:'';position:absolute;left:12px;top:0;bottom:0;width:2px;background:var(--border)}
+.path-day{position:relative;margin-bottom:18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;transition:all .2s}
+.path-day:hover{border-color:var(--accent)}
+.path-day::before{content:'';position:absolute;left:-30px;top:20px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+.day-num{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px}
+.day-focus{font-size:15px;font-weight:700;margin-bottom:4px}
+.day-act{font-size:13px;color:var(--muted)}
+.day-meta{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.pri-high{background:rgba(239,71,111,.15);color:var(--accent4)}
+.pri-medium{background:rgba(255,209,102,.15);color:var(--accent3)}
+.pri-low{background:rgba(6,214,160,.15);color:var(--accent2)}
+.insight-box{background:rgba(124,106,247,.08);border:1px solid rgba(124,106,247,.2);border-radius:12px;padding:16px 18px;margin-bottom:24px;font-size:14px;font-style:italic;color:var(--text);display:flex;align-items:center;gap:12px}
+
+/* Concept Map */
+#concept-map-canvas{width:100%;height:480px;background:var(--surface2);border-radius:12px;border:1px solid var(--border)}
+.concept-subject-btns{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.subj-btn{padding:8px 16px;border-radius:20px;font-size:13px;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .15s}
+.subj-btn:hover,.subj-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(124,106,247,.1)}
+
+/* Forgetting */
+.forget-item{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.forget-item:last-child{border-bottom:none}
+.forget-topic{flex:1}.ft{font-size:14px;font-weight:600}.fs{font-size:12px;color:var(--muted)}
+.retention-bar{width:120px;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.retention-fill{height:100%;border-radius:3px;transition:width 1s}
+.ret-high{background:var(--accent2)}.ret-mid{background:var(--accent3)}.ret-low{background:var(--accent4)}
+.ret-pct{font-size:13px;font-weight:700;font-family:var(--mono);min-width:42px;text-align:right}
+.priority-badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700}
+
+/* Misc */
+.spinner-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:40px}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+.spinner-text{color:var(--muted);font-size:14px}
+.empty-state{text-align:center;padding:48px;color:var(--muted)}
+.empty-state .big{font-size:48px;margin-bottom:12px}
+.empty-state p{font-size:15px;line-height:1.6}
+
+@keyframes popIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div id="onboarding">
+  <div class="onboard-card">
+    <div class="logo">🧠</div>
+    <h1>NeuralPath</h1>
+    <p style="margin-bottom: 24px;">Your AI-powered adaptive learning companion.</p>
+
+    <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchAuthTab('signup', this)">Sign Up</button>
+        <button class="auth-tab" onclick="switchAuthTab('login', this)">Sign In</button>
+    </div>
+
+    <div id="signup-form">
+        <div class="form-group"><label>Your Name</label><input type="text" id="ob-name" placeholder="Enter your name"/></div>
+        <div class="form-group"><label>Gmail Address</label><input type="email" id="ob-email" placeholder="name@gmail.com"/></div>
+        <div class="form-group">
+          <label>Learning Style</label>
+          <select id="ob-style">
+            <option value="conceptual">🧠 Conceptual — Theory & definitions</option>
+            <option value="analytical">📊 Analytical — Step-by-step reasoning</option>
+            <option value="visual">👁 Visual — Spatial & diagram-based</option>
+            <option value="practical">🔧 Practical — Real-world applications</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="submitAuth('signup')">Create Account →</button>
+    </div>
+
+    <div id="login-form" style="display: none;">
+        <div class="form-group"><label>Gmail Address</label><input type="email" id="login-email" placeholder="name@gmail.com"/></div>
+        <button class="btn-primary" onclick="submitAuth('login')">Sign In →</button>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <nav class="sidebar">
+    <div class="sidebar-logo"><h2>NeuralPath</h2><p>Adaptive Learning AI</p></div>
+    <div class="nav-item active"  onclick="showPage('dashboard')"><span class="icon">📊</span> Dashboard</div>
+    <div class="nav-item"         onclick="showPage('subjects')"><span class="icon">📚</span> Subjects & Quiz</div>
+    <div class="nav-item"         onclick="showPage('path-page')"><span class="icon">🗺️</span> Learning Path</div>
+    <div class="nav-item"         onclick="showPage('concepts-page')"><span class="icon">🕸️</span> Concept Map</div>
+    <div class="nav-item"         onclick="showPage('forgetting-page')"><span class="icon">📉</span> Forgetting Curve</div>
+    
+    <div class="sidebar-bottom">
+      <div class="student-chip" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="avatar-sm" id="sidebar-avatar">?</div>
+            <div><div class="sname" id="sidebar-name">—</div><div class="srole" id="sidebar-style">—</div></div>
+        </div>
+        <button class="logout-btn" onclick="logout()" title="Logout">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+            <line x1="12" y1="2" x2="12" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="page active" id="dashboard">
+      <div class="page-header"><h1>📊 Learning Dashboard</h1><p>Your performance overview, strengths & weaknesses at a glance.</p></div>
+      <div id="dashboard-content"><div class="spinner-wrap"><div class="spinner"></div><span class="spinner-text">Loading your data…</span></div></div>
+    </div>
+
+    <div class="page" id="subjects">
+      <div class="page-header"><h1>📚 Subjects & Notes</h1><p>Upload your notes to generate a custom curriculum, or choose an existing topic.</p></div>
+      
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-title">CREATE SUBJECT FROM NOTES</div>
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">
+            <input type="text" id="new-subject-name" placeholder="Subject Name (e.g. History)" class="form-group" style="margin:0; width:auto; flex:1; padding:10px;">
+            <input type="file" id="notes-file" accept=".txt,.pdf" style="color:var(--text); font-size: 14px;">
+            <button class="btn btn-accent" id="upload-btn" onclick="uploadNotes()">Upload & Process Notes</button>
+        </div>
+        <div id="upload-status" style="margin-top:10px; font-size:13px; color:var(--muted)"></div>
+      </div>
+
+      <div class="subject-grid" id="subject-grid"></div>
+      
+      <div id="topic-panel" style="display:none;margin-top:24px;">
+        <div class="card">
+          <div class="card-title" id="topic-panel-title">SELECT TOPIC</div>
+          <div class="topic-pills" id="topic-pills"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="quiz-page" style="max-width:760px;">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="btn btn-outline" onclick="showPage('subjects')" style="padding:8px 14px;font-size:13px;">← Back</button>
+          <div><h1 id="quiz-title">Quiz</h1><p id="quiz-subtitle" style="color:var(--muted);font-size:14px;">Adaptive difficulty</p></div>
+        </div>
+      </div>
+      <div class="quiz-progress" id="quiz-progress"></div>
+      <div id="quiz-container"></div>
+      <div class="result-card" id="result-card">
+        <div class="result-score" id="result-score">0%</div>
+        <div class="result-label" id="result-label">Quiz Complete</div>
+        <div class="result-breakdown">
+          <div class="rb-item"><div class="rb-val" id="rb-correct">0</div><div class="rb-key">Correct</div></div>
+          <div class="rb-item"><div class="rb-val" id="rb-total">0</div><div class="rb-key">Total</div></div>
+          <div class="rb-item"><div class="rb-val" id="rb-pct">0%</div><div class="rb-key">Score</div></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn btn-accent"   onclick="retakeQuiz()">Retake Quiz</button>
+          <button class="btn btn-outline"  onclick="showPage('dashboard');loadDashboard()">View Dashboard</button>
+          <button class="btn btn-success"  onclick="showPage('subjects')">Next Topic</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="path-page">
+      <div class="page-header"><h1>🗺️ Personalised Learning Path</h1><p>AI-generated 7-day study plan based on your performance gaps.</p></div>
+      <div id="path-content"><div class="spinner-wrap"><div class="spinner"></div><span class="spinner-text">Generating your path…</span></div></div>
+    </div>
+
+    <div class="page" id="concepts-page">
+      <div class="page-header"><h1>🕸️ Concept Relationship Map</h1><p>Visualise how topics connect within a subject.</p></div>
+      <div class="concept-subject-btns" id="concept-subj-btns"></div>
+      <div class="card"><canvas id="concept-map-canvas"></canvas></div>
+      <div id="concept-legend" style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;"></div>
+    </div>
+
+    <div class="page" id="forgetting-page">
+      <div class="page-header"><h1>📉 Forgetting Curve Optimiser</h1><p>Topics most at risk of being forgotten — prioritise these for review.</p></div>
+      <div class="grid-2" style="gap:18px;">
+        <div class="card"><div class="card-title">AT-RISK TOPICS</div><div id="forgetting-list"></div></div>
+        <div class="card"><div class="card-title">RETENTION OVER TIME (EBBINGHAUS)</div><div class="chart-wrap"><canvas id="forget-chart"></canvas></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const STATE = {
+  currentSubject:null, currentTopic:null,
+  questions:[], answers:[], currentQ:0,
+  difficulty:'easy', style:'conceptual',
+  charts:{}
+};
+
+// ── Auth Logic ──
+function switchAuthTab(tab, btnElement) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    btnElement.classList.add('active');
+    document.getElementById('signup-form').style.display = tab === 'signup' ? 'block' : 'none';
+    document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+}
+
+async function submitAuth(type) {
+    let endpoint, payload;
+    
+    if (type === 'signup') {
+        const name = document.getElementById('ob-name').value.trim();
+        const email = document.getElementById('ob-email').value.trim();
+        const style = document.getElementById('ob-style').value;
+        if (!name || !email) { alert('Name and email are required!'); return; }
+        endpoint = '/signup';
+        payload = {name, email, style};
+    } else {
+        const email = document.getElementById('login-email').value.trim();
+        if (!email) { alert('Email is required!'); return; }
+        endpoint = '/login';
+        payload = {email};
+    }
+
+    const res = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const data = await res.json();
+    
+    if (!data.ok) { 
+        alert(data.error); 
+        return; 
+    }
+    
+    // Setup UI on successful login/signup
+    document.getElementById('onboarding').style.display='none';
+    document.getElementById('app').style.display='block';
+    
+    // Fetch latest style (crucial for returning users who logged in)
+    const infoRes = await fetch('/student_info');
+    const info = await infoRes.json();
+    
+    updateSidebar(info.name, info.style);
+    buildSubjectGrid();
+    buildConceptBtns();
+    loadDashboard();
+}
+
+async function logout() {
+  if(!confirm("Are you sure you want to log out?")) return;
+  
+  await fetch('/logout', { method: 'POST' });
+  
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('onboarding').style.display = 'flex';
+  
+  // Clear inputs
+  document.getElementById('ob-name').value = '';
+  document.getElementById('ob-email').value = '';
+  document.getElementById('login-email').value = '';
+  
+  if(STATE.charts.radar) STATE.charts.radar.destroy();
+  if(STATE.charts.bar) STATE.charts.bar.destroy();
+  if(STATE.charts.forget) STATE.charts.forget.destroy();
+}
+
+function updateSidebar(name,style){
+  document.getElementById('sidebar-name').textContent=name;
+  document.getElementById('sidebar-avatar').textContent=name[0].toUpperCase();
+  const labels={conceptual:'Conceptual Learner',analytical:'Analytical Learner',visual:'Visual Learner',practical:'Practical Learner'};
+  document.getElementById('sidebar-style').textContent=labels[style]||style;
+}
+
+// ── Navigation ──
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const map={dashboard:0,subjects:1,'path-page':2,'concepts-page':3,'forgetting-page':4};
+  const items=document.querySelectorAll('.nav-item');
+  if(map[id]!==undefined) items[map[id]].classList.add('active');
+  if(id==='path-page') loadPath();
+  if(id==='forgetting-page') loadForgettingPage();
+  if(id==='concepts-page') buildConceptBtns();
+}
+
+// ── Notes Upload ──
+async function uploadNotes() {
+  const subjectInput = document.getElementById('new-subject-name').value.trim();
+  const fileInput = document.getElementById('notes-file');
+  const statusDiv = document.getElementById('upload-status');
+  const btn = document.getElementById('upload-btn');
+
+  if (!subjectInput || !fileInput.files[0]) {
+    statusDiv.innerHTML = '⚠️ Please provide a subject name and select a file.';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('subject', subjectInput);
+  formData.append('file', fileInput.files[0]);
+
+  statusDiv.innerHTML = '<span style="color:var(--accent)">⏳ Reading notes and generating curriculum with AI... this may take a moment.</span>';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/upload_notes', { method: 'POST', body: formData });
+    const data = await res.json();
+    
+    if (data.status === 'success') {
+      statusDiv.innerHTML = '✅ Notes processed successfully! Curriculum updated.';
+      document.getElementById('new-subject-name').value = '';
+      fileInput.value = '';
+      buildSubjectGrid(); 
+    } else {
+      statusDiv.innerHTML = '❌ Error: ' + data.error;
+    }
+  } catch (err) {
+    statusDiv.innerHTML = '❌ Network error occurred.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Subjects ──
+async function buildSubjectGrid(){
+  const res=await fetch('/curriculum');
+  const cur=await res.json();
+  const grid=document.getElementById('subject-grid');
+  grid.innerHTML='';
+  
+  if (Object.keys(cur).length === 0) {
+      grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color: var(--muted)">No subjects yet. Upload notes to create your first subject!</div>';
+      return;
+  }
+
+  Object.entries(cur).forEach(([subj,data],idx)=>{
+    const card=document.createElement('div');
+    card.className='subject-card';
+    card.style.borderTop=`3px solid ${data.color || '#7c6af7'}`;
+    card.innerHTML=`<span class="subject-icon">${data.icon || '📚'}</span><div class="subject-name">${subj}</div><div class="subject-topics-count">${data.topics.length} topics</div><div class="tag-row">${data.topics.slice(0,3).map(t=>`<span class="topic-tag">${t}</span>`).join('')}</div>`;
+    card.onclick=()=>openTopicPanel(subj,data.topics);
+    grid.appendChild(card);
+  });
+}
+
+function openTopicPanel(subject,topics){
+  STATE.currentSubject=subject;
+  document.getElementById('topic-panel').style.display='block';
+  document.getElementById('topic-panel-title').textContent=`SELECT TOPIC — ${subject.toUpperCase()}`;
+  document.getElementById('topic-pills').innerHTML=topics.map(t=>`<button class="topic-pill" onclick="startQuiz('${subject}','${t}')">${t}</button>`).join('');
+  document.getElementById('topic-panel').scrollIntoView({behavior:'smooth'});
+}
+
+// ── Quiz ──
+async function startQuiz(subject,topic){
+  STATE.currentSubject=subject; STATE.currentTopic=topic;
+  showPage('quiz-page');
+  document.getElementById('quiz-title').textContent=`${subject} — ${topic}`;
+  document.getElementById('quiz-subtitle').textContent='Generating questions from your notes...';
+  document.getElementById('quiz-container').innerHTML='<div class="spinner-wrap"><div class="spinner"></div><span class="spinner-text">Reading notes & generating questions with AI…</span></div>';
+  document.getElementById('result-card').style.display='none';
+  const res=await fetch(`/quiz/${encodeURIComponent(subject)}/${encodeURIComponent(topic)}`);
+  const data=await res.json();
+  STATE.questions=data.questions; STATE.difficulty=data.difficulty;
+  STATE.style=data.style; STATE.answers=new Array(data.questions.length).fill(null); STATE.currentQ=0;
+  document.getElementById('quiz-subtitle').textContent=`Difficulty: ${data.difficulty.toUpperCase()} | Style: ${data.style}`;
+  buildDots(); renderQ(0);
+}
+
+function retakeQuiz(){ startQuiz(STATE.currentSubject,STATE.currentTopic); }
+
+function buildDots(){
+  document.getElementById('quiz-progress').innerHTML=STATE.questions.map((_,i)=>`<div class="q-dot ${i===0?'current':''}" id="qdot-${i}"></div>`).join('');
+}
+
+function updateDots(idx){
+  STATE.questions.forEach((_,i)=>{
+    const d=document.getElementById(`qdot-${i}`);
+    if(!d) return;
+    d.className='q-dot';
+    if(i<idx) d.classList.add('done');
+    else if(i===idx) d.classList.add('current');
+  });
+}
+
+function renderQ(idx){
+  updateDots(idx);
+  const q=STATE.questions[idx];
+  const letters=['A','B','C','D'];
+  document.getElementById('quiz-container').innerHTML=`
+    <div class="question-card">
+      <div class="q-meta">
+        <span class="q-badge badge-sub">${STATE.currentSubject}</span>
+        <span class="q-badge badge-${STATE.difficulty}">${STATE.difficulty}</span>
+        <span class="q-badge" style="background:var(--surface2);color:var(--muted)">Q${idx+1}/${STATE.questions.length}</span>
+      </div>
+      <div class="question-text">${q.question}</div>
+      <div class="options">${q.options.map((opt,oi)=>`
+        <div class="option" id="opt-${oi}" onclick="selectOpt(${idx},${oi})">
+          <span class="option-letter">${letters[oi]}</span>
+          <span>${opt.replace(/^[A-D]\)\s*/,'')}</span>
+        </div>`).join('')}</div>
+      <div class="explanation-box" id="explanation">${q.explanation}</div>
+    </div>
+    <div class="quiz-nav">
+      ${idx>0?`<button class="btn btn-outline" onclick="renderQ(${idx-1})">← Prev</button>`:''}
+      <button class="btn btn-accent" style="margin-left:auto;" onclick="${idx<STATE.questions.length-1?`renderQ(${idx+1})`:'finishQuiz()'}">
+        ${idx<STATE.questions.length-1?'Next →':'✓ Submit Quiz'}
+      </button>
+    </div>`;
+  if(STATE.answers[idx]!==null) highlightAns(STATE.answers[idx],false);
+}
+
+function selectOpt(qIdx,optIdx){
+  STATE.answers[qIdx]=optIdx;
+  highlightAns(optIdx,true);
+}
+
+function highlightAns(optIdx,showExp){
+  document.querySelectorAll('.option').forEach((el,i)=>{
+    el.className='option';
+    if(i===optIdx) el.classList.add('selected');
+  });
+  if(showExp) document.getElementById('explanation').classList.add('visible');
+}
+
+async function finishQuiz(){
+  const unan=STATE.answers.filter(a=>a===null).length;
+  if(unan>0&&!confirm(`${unan} question(s) unanswered. Submit anyway?`)) return;
+  STATE.answers=STATE.answers.map(a=>a===null?0:a);
+  document.getElementById('quiz-container').innerHTML='';
+  document.getElementById('quiz-progress').innerHTML='';
+  const res=await fetch('/submit_quiz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject:STATE.currentSubject,topic:STATE.currentTopic,answers:STATE.answers,questions:STATE.questions})});
+  const data=await res.json();
+  const card=document.getElementById('result-card');
+  card.style.display='block';
+  const pct=data.percentage;
+  const color=pct>=75?'var(--accent2)':pct>=50?'var(--accent3)':'var(--accent4)';
+  const label=pct>=75?'🎉 Excellent Work!':pct>=50?'👍 Good Progress!':'💪 Keep Practicing!';
+  document.getElementById('result-score').textContent=`${pct}%`;
+  document.getElementById('result-score').style.color=color;
+  document.getElementById('result-label').textContent=label;
+  document.getElementById('rb-correct').textContent=data.score;
+  document.getElementById('rb-total').textContent=data.total;
+  document.getElementById('rb-pct').textContent=`${pct}%`;
+}
+
+// ── Dashboard ──
+async function loadDashboard(){
+  document.getElementById('dashboard-content').innerHTML='<div class="spinner-wrap"><div class="spinner"></div><span class="spinner-text">Analysing your performance…</span></div>';
+  const res=await fetch('/dashboard');
+  const data=await res.json();
+  if(!Object.keys(data.subject_scores||{}).length){
+    document.getElementById('dashboard-content').innerHTML=`<div class="empty-state"><div class="big">📚</div><p>No quiz data yet! Head to <strong>Subjects</strong>, upload notes, and take a quiz to see your dashboard.</p><button class="btn btn-accent" style="margin-top:16px;" onclick="showPage('subjects')">Get Started →</button></div>`;
+    return;
+  }
+  document.getElementById('dashboard-content').innerHTML=`
+    <div class="stats-row">
+      <div class="stat-card s1"><div class="stat-val">${data.overall_avg}%</div><div class="stat-label">Overall Average</div></div>
+      <div class="stat-card s2"><div class="stat-val">${data.total_attempts}</div><div class="stat-label">Quizzes Taken</div></div>
+      <div class="stat-card s3"><div class="stat-val">${data.strengths.length}</div><div class="stat-label">Strong Topics</div></div>
+      <div class="stat-card s4"><div class="stat-val">${data.weaknesses.length}</div><div class="stat-label">Weak Topics</div></div>
+    </div>
+    <div class="grid-2" style="margin-bottom:18px;">
+      <div class="card"><div class="card-title">💪 STRENGTHS</div>
+        ${data.strengths.length?data.strengths.map(s=>`<div class="sw-item"><div class="sw-header"><span class="sw-label">${s.label} <span style="color:var(--muted);font-size:11px;">${s.subject}</span></span><span class="sw-score" style="color:var(--accent2)">${s.score}%</span></div><div class="bar-track"><div class="bar-fill bar-strength" style="width:${s.score}%"></div></div></div>`).join(''):'<p style="color:var(--muted);font-size:13px;">Take more quizzes to reveal strengths!</p>'}
+      </div>
+      <div class="card"><div class="card-title">🎯 AREAS TO IMPROVE</div>
+        ${data.weaknesses.length?data.weaknesses.map(w=>`<div class="sw-item"><div class="sw-header"><span class="sw-label">${w.label} <span style="color:var(--muted);font-size:11px;">${w.subject}</span></span><span class="sw-score" style="color:var(--accent4)">${w.score}%</span></div><div class="bar-track"><div class="bar-fill bar-weakness" style="width:${w.score}%"></div></div></div>`).join(''):'<p style="color:var(--muted);font-size:13px;">Great job — no weak areas yet!</p>'}
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><div class="card-title">SUBJECT PERFORMANCE RADAR</div><div class="chart-wrap"><canvas id="radar-chart"></canvas></div></div>
+      <div class="card"><div class="card-title">TOPIC SCORE BREAKDOWN</div><div class="chart-wrap"><canvas id="bar-chart"></canvas></div></div>
+    </div>`;
+
+  // Radar
+  // --- NEW SUBJECT PROFICIENCY CHART (POLAR AREA) ---
+  const subjKeys = Object.keys(data.subject_scores);
+  const subjVals = Object.values(data.subject_scores);
+  
+  // Dynamic colors so each subject gets a distinct, vibrant wedge
+  const polarBg = ['rgba(124,106,247,0.7)', 'rgba(6,214,160,0.7)', 'rgba(255,209,102,0.7)', 'rgba(239,71,111,0.7)', 'rgba(14,165,233,0.7)'];
+  const polarBorder = ['#7c6af7', '#06d6a0', '#ffd166', '#ef476f', '#0ea5e9'];
+
+  if(STATE.charts.radar) STATE.charts.radar.destroy();
+  STATE.charts.radar = new Chart(document.getElementById('radar-chart').getContext('2d'), {
+    type: 'polarArea',
+    data: {
+      labels: subjKeys,
+      datasets: [{
+        label: 'Average Score %',
+        data: subjVals,
+        backgroundColor: subjKeys.map((_, i) => polarBg[i % polarBg.length]),
+        borderColor: subjKeys.map((_, i) => polarBorder[i % polarBorder.length]),
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          min: 0, 
+          max: 100,
+          ticks: { display: false }, // Hides the overlapping numbers
+          grid: { color: '#2a2a4a' },
+          pointLabels: { display: false } 
+        }
+      },
+      plugins: {
+        legend: { 
+            display: true, 
+            position: 'right', 
+            labels: { color: '#e8e8ff', font: { family: "'Outfit', sans-serif", size: 12 } }
+        },
+        tooltip: {
+            backgroundColor: '#1a1a35',
+            titleColor: '#e8e8ff',
+            bodyColor: '#06d6a0',
+            padding: 12,
+            boxPadding: 6
+        }
+      }
+    }
+  });
+
+  // Bar
+  const tkeys=Object.keys(data.topic_avgs);
+  const tlabels=tkeys.map(k=>data.topic_avgs[k].topic);
+  const tvals=tkeys.map(k=>data.topic_avgs[k].avg);
+  const bcolors=tvals.map(v=>v>=75?'#06d6a0':v>=50?'#ffd166':'#ef476f');
+  if(STATE.charts.bar) STATE.charts.bar.destroy();
+  STATE.charts.bar=new Chart(document.getElementById('bar-chart').getContext('2d'),{
+    type:'bar',
+    data:{labels:tlabels,datasets:[{label:'Avg Score %',data:tvals,backgroundColor:bcolors,borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:0,max:100,ticks:{color:'#6b6b99'},grid:{color:'#2a2a4a'}},x:{ticks:{color:'#6b6b99',maxRotation:35},grid:{display:false}}},plugins:{legend:{display:false}}}
+  });
+}
+
+// ── Learning Path ──
+async function loadPath(){
+  document.getElementById('path-content').innerHTML='<div class="spinner-wrap"><div class="spinner"></div><span class="spinner-text">Building personalised path with AI…</span></div>';
+  const res=await fetch('/learning_path');
+  const data=await res.json();
+  const pc=p=>({high:'pri-high',medium:'pri-medium',low:'pri-low'})[p]||'pri-low';
+  document.getElementById('path-content').innerHTML=`
+    ${data.insight?`<div class="insight-box">💡 <span>${data.insight}</span></div>`:''}
+    <div class="path-timeline">
+      ${(data.path||[]).map(d=>`<div class="path-day"><div class="day-num">Day ${d.day}</div><div class="day-focus">${d.focus}</div><div class="day-act">${d.activity}</div><div class="day-meta"><span class="q-badge badge-sub">${d.subject}</span><span class="q-badge ${pc(d.priority)}">${(d.priority||'').toUpperCase()}</span><span class="q-badge" style="background:var(--surface2);color:var(--muted)">⏱ ${d.duration_min} min</span></div></div>`).join('')}
+    </div>`;
+}
+
+// ── Concept Map ──
+async function buildConceptBtns(){
+  const res=await fetch('/curriculum');
+  const cur=await res.json();
+  const subjects=Object.keys(cur);
+  if(subjects.length === 0) {
+      document.getElementById('concept-subj-btns').innerHTML = '<span style="color:var(--muted);font-size:14px;">Upload notes to see the concept map.</span>';
+      return;
+  }
+  document.getElementById('concept-subj-btns').innerHTML=subjects.map(s=>`<button class="subj-btn" onclick="loadConceptMap('${s}',this)">${s}</button>`).join('');
+  if(subjects.length > 0) {
+      loadConceptMap(subjects[0], document.querySelector('.subj-btn'));
+  }
+}
+
+async function loadConceptMap(subject,btn){
+  document.querySelectorAll('.subj-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const canvas=document.getElementById('concept-map-canvas');
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#6b6b99'; ctx.font='14px Outfit'; ctx.textAlign='center';
+  ctx.fillText('Loading…',canvas.width/2,canvas.height/2);
+  const res=await fetch(`/concept_map/${encodeURIComponent(subject)}`);
+  const data=await res.json();
+  drawMap(canvas,ctx,data);
+}
+
+function drawMap(canvas,ctx,data){
+  const W=canvas.offsetWidth||800, H=480;
+  canvas.width=W; canvas.height=H;
+  ctx.clearRect(0,0,W,H);
+  const lcol={1:'#7c6af7',2:'#06d6a0',3:'#ffd166'};
+  const nodes=data.nodes||[], edges=data.edges||[];
+  const byLevel={};
+  nodes.forEach(n=>{ const lv=n.level||1; if(!byLevel[lv]) byLevel[lv]=[]; byLevel[lv].push(n); });
+  const pos={};
+  Object.entries(byLevel).forEach(([lv,ns])=>{
+    const y=(parseInt(lv)/(Object.keys(byLevel).length+1))*H;
+    const gap=W/(ns.length+1);
+    ns.forEach((n,i)=>{ pos[n.id]={x:gap*(i+1),y}; });
+  });
+  // Edges
+  edges.forEach(e=>{
+    const f=pos[e.from], t=pos[e.to]; if(!f||!t) return;
+    ctx.strokeStyle='rgba(124,106,247,.3)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(f.x,f.y);
+    ctx.quadraticCurveTo((f.x+t.x)/2,(f.y+t.y)/2-20,t.x,t.y); ctx.stroke();
+    if(e.label){ ctx.fillStyle='#6b6b99'; ctx.font='10px JetBrains Mono'; ctx.textAlign='center'; ctx.fillText(e.label,(f.x+t.x)/2,(f.y+t.y)/2-24); }
+  });
+  // Nodes
+  nodes.forEach(n=>{
+    const p=pos[n.id]; if(!p) return;
+    const color=lcol[n.level]||'#7c6af7';
+    ctx.shadowColor=color; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.arc(p.x,p.y,38,0,Math.PI*2);
+    ctx.fillStyle=color+'22'; ctx.fill();
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#e8e8ff'; ctx.font='600 11px Outfit'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const words=n.label.split(' ');
+    if(words.length===1){ ctx.fillText(n.label,p.x,p.y); }
+    else{ ctx.fillText(words[0],p.x,p.y-7); ctx.fillText(words.slice(1).join(' '),p.x,p.y+7); }
+  });
+  document.getElementById('concept-legend').innerHTML=`<span style="font-size:12px;color:var(--muted)">Legend:</span>${Object.entries(lcol).map(([lv,col])=>`<span style="display:flex;align-items:center;gap:6px;font-size:12px;"><span style="width:12px;height:12px;border-radius:50%;background:${col};display:inline-block;"></span>${({1:'Foundational',2:'Intermediate',3:'Advanced'})[lv]}</span>`).join('')}`;
+}
+
+// ── Forgetting Curve ──
+async function loadForgettingPage(){
+  const res=await fetch('/dashboard');
+  const data=await res.json();
+  const list=document.getElementById('forgetting-list');
+  
+  if(!data.forgetting||!data.forgetting.length){
+    list.innerHTML='<div class="empty-state"><div class="big">✨</div><p>No at-risk topics yet.<br>Take more quizzes to track retention.</p></div>';
+  } else {
+    list.innerHTML=data.forgetting.map(f=>{
+      const fc=f.retention>=70?'ret-high':f.retention>=40?'ret-mid':'ret-low';
+      const pc=f.priority==='HIGH'?'pri-high':'pri-medium';
+      return `<div class="forget-item"><div class="forget-topic"><div class="ft">${f.topic}</div><div class="fs">${f.subject}</div></div><div class="retention-bar"><div class="retention-fill ${fc}" style="width:${f.retention}%"></div></div><div class="ret-pct" style="color:${f.retention<40?'var(--accent4)':f.retention<70?'var(--accent3)':'var(--accent2)'}">${f.retention}%</div><span class="priority-badge q-badge ${pc}">${f.priority}</span></div>`;
+    }).join('');
+  }
+  
+  // GENUINE FORGETTING CURVE MATH (Scaled for 30 Days)
+  const baseStrength = (data.avg_memory_strength || 1.0) * 14; 
+  const days=[0,1,2,4,7,14,21,30];
+  
+  const noRev=days.map(d=>Math.round(100*Math.exp(-d / baseStrength)));
+  const withRev=days.map(d=>Math.round(100*Math.exp(-d / (baseStrength * 2.5))));
+  
+  if(STATE.charts.forget) STATE.charts.forget.destroy();
+  STATE.charts.forget=new Chart(document.getElementById('forget-chart').getContext('2d'),{
+    type:'line',
+    data:{labels:days.map(d=>`Day ${d}`),datasets:[
+      {label:'Your Current Retention',data:noRev,borderColor:'#ef476f',backgroundColor:'rgba(239,71,111,.1)',fill:true,tension:.4,pointRadius:4},
+      {label:'If You Review Today',data:withRev,borderColor:'#06d6a0',backgroundColor:'rgba(6,214,160,.1)',fill:true,tension:.4,pointRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:0,max:100,ticks:{color:'#6b6b99',callback:v=>v+'%'},grid:{color:'#2a2a4a'}},x:{ticks:{color:'#6b6b99'},grid:{display:false}}},plugins:{legend:{labels:{color:'#e8e8ff',font:{size:12}}}}}
+  });
+}
+
+// ── Init (returning session) ──
+(async()=>{
+  const res=await fetch('/student_info');
+  const info=await res.json();
+  if(info.name&&info.name!=='Student'){
+    document.getElementById('onboarding').style.display='none';
+    document.getElementById('app').style.display='block';
+    updateSidebar(info.name,info.style);
+    buildSubjectGrid(); buildConceptBtns(); loadDashboard();
+  }
+})();
+</script>
+</body>
+</html>
